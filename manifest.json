@@ -1,0 +1,12 @@
+{
+	"id": "obsidian-character-manager",
+	"name": "Character-Manager",
+	"version": "1.4.0",
+	"minAppVersion": "1.4.0",
+	"description": "在Obsidian中创建和管理角色设定，支持列表、网格、卡片三种显示模式。",
+	"author": "BorderArea01",
+	"authorUrl": "https://github.com/character-manager",
+	"helpUrl": "https://github.com/character-creator/obsidian-character-manager",
+	"isDesktopOnly": false,
+	"main": "main.js"
+}
