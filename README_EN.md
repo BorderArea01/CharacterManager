@@ -2,6 +2,11 @@
 
 A powerful Obsidian plugin designed for Managers, game designers, novelists, and anyone who needs to manage character profiles. Features multi-page management, dynamic field configuration, image management, search functionality, and more, making character profile management simple and efficient.
 
+![Preview 1](images/preview1.png)
+![Preview 2](images/preview2.png)
+![Preview 3](images/preview3.png)
+![Preview 4](images/preview4.png)
+
 ## ✨ Key Features
 
 ### 🎭 Character Management
