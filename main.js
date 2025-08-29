@@ -27,7 +27,7 @@ class CharacterCreatorView extends ItemView {
     }
 
     async onOpen() {
-        this.characterCreator = new CharacterCreator(this.containerEl, this.app);
+        this.characterCreator = new CharacterCreator(this.containerEl, this.app, this.plugin);
         this.characterCreator.init();
     }
 
@@ -94,9 +94,26 @@ class CharacterCreatorPlugin extends Plugin {
                 this.showFilePathModal();
             }
         });
+
+        // 添加测试命令
+        this.addCommand({
+            id: 'test-image-package',
+            name: '测试图包功能',
+            callback: () => {
+                if (this.characterCreator) {
+                    this.characterCreator.testImagePackageFunction();
+                }
+            }
+        });
     }
 
     showConfigurationModal() {
+        // 清理可能存在的旧模态框
+        const existingModal = document.querySelector('.character-creator__modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
         const modal = document.createElement('div');
         modal.className = 'character-creator__modal';
         modal.innerHTML = `
@@ -132,35 +149,70 @@ class CharacterCreatorPlugin extends Plugin {
 
         document.body.appendChild(modal);
 
-        modal.querySelector('.character-creator__modal-close').addEventListener('click', () => {
-            modal.remove();
+        // 确保输入框可以正常编辑
+        const inputs = modal.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            input.removeAttribute('readonly');
+            input.removeAttribute('disabled');
         });
 
-        modal.querySelector('#cancelBtn').addEventListener('click', () => {
-            modal.remove();
-        });
+        const closeModal = () => {
+            if (modal && modal.parentNode) {
+                modal.remove();
+            }
+        };
+
+        modal.querySelector('.character-creator__modal-close').addEventListener('click', closeModal);
+
+        modal.querySelector('#cancelBtn').addEventListener('click', closeModal);
 
         modal.querySelector('#configurationForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(e.target);
+            try {
+                const formData = new FormData(e.target);
 
-            this.settings.dataFolder = formData.get('dataFolder') || 'character-creator';
-            this.settings.imageFolder = formData.get('imageFolder') || 'character-images';
+                this.settings.dataFolder = formData.get('dataFolder') || 'character-creator';
+                this.settings.imageFolder = formData.get('imageFolder') || 'character-images';
 
-            await this.saveSettings();
-            new Notice('配置保存成功');
-            modal.remove();
+                await this.saveSettings();
+                new Notice('配置保存成功');
+                closeModal();
+            } catch (error) {
+                console.error('保存配置失败:', error);
+                new Notice('保存配置失败，请重试');
+            }
         });
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                modal.remove();
+                closeModal();
             }
         });
+
+        // 防止事件冒泡导致的问题
+        modal.querySelector('.character-creator__modal-content').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // 自动聚焦到第一个输入框
+        setTimeout(() => {
+            const firstInput = modal.querySelector('input[name="dataFolder"]');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
     }
 
     onunload() {
         console.log('角色设定器插件已卸载');
+
+        // 清理所有可能存在的模态框
+        const modals = document.querySelectorAll('.character-creator__modal');
+        modals.forEach(modal => {
+            if (modal && modal.parentNode) {
+                modal.remove();
+            }
+        });
     }
 
     showFilePathModal() {
@@ -320,21 +372,22 @@ class Setting {
 }
 
 class CharacterCreator {
-    constructor(container, app) {
+    constructor(container, app, plugin) {
         this.container = container;
         this.app = app;
+        this.plugin = plugin;
         this.pages = [];
         this.currentPageId = null;
         this.currentView = 'card';
-        this.plugin = null;
         this.initPlugin();
     }
 
     initPlugin() {
-        try {
-            this.plugin = this.app.plugins.plugins['obsidian-character-creator'];
-        } catch (error) {
-            console.error('无法获取插件实例:', error);
+        // 插件实例已经通过构造函数传递，这里可以添加额外的初始化逻辑
+        if (!this.plugin) {
+            console.warn('插件实例未正确传递');
+        } else {
+            console.log('插件实例已正确初始化');
         }
     }
 
@@ -352,11 +405,6 @@ class CharacterCreator {
 
     async loadData() {
         try {
-            // 确保插件已初始化
-            if (!this.plugin) {
-                this.initPlugin();
-            }
-
             const dataFolder = this.plugin && this.plugin.settings ? this.plugin.settings.dataFolder : 'character-creator';
 
             await this.ensureFolderExists(dataFolder);
@@ -444,10 +492,17 @@ class CharacterCreator {
     }
 
     async ensureFolderExists(folderPath) {
+        console.log('确保文件夹存在:', folderPath);
         try {
             await this.app.vault.createFolder(folderPath);
+            console.log('文件夹创建成功:', folderPath);
         } catch (error) {
-            // 文件夹可能已存在，忽略错误
+            if (error.message.includes('already exists')) {
+                console.log('文件夹已存在:', folderPath);
+            } else {
+                console.error('创建文件夹失败:', folderPath, error);
+                throw error;
+            }
         }
     }
 
@@ -1134,19 +1189,15 @@ class CharacterCreator {
 
     async showAddCharacterModal() {
         const currentPage = this.getCurrentPage();
-        if (!currentPage) return;
+        if (!currentPage) {
+            new Notice('请先选择一个页面');
+            return;
+        }
 
-        // 确保页面有模板设置
-        if (!currentPage.template) {
-            currentPage.template = {
-                fields: [
-                    { name: '年龄', type: 'number', value: 25, required: true },
-                    { name: '种族', type: 'select', value: '人类', options: ['人类', '精灵', '矮人', '半身人', '兽人'], required: true },
-                    { name: '职业', type: 'select', value: '战士', options: ['战士', '法师', '盗贼', '牧师', '游侠'], required: true },
-                    { name: '标签', type: 'tags', value: ['勇敢', '正义'], required: false },
-                    { name: '描述', type: 'textarea', value: '请输入角色描述...', required: true }
-                ]
-            };
+        // 清理可能存在的旧模态框
+        const existingModal = document.querySelector('.character-creator__modal');
+        if (existingModal) {
+            existingModal.remove();
         }
 
         const modal = document.createElement('div');
@@ -1175,25 +1226,52 @@ class CharacterCreator {
 
         document.body.appendChild(modal);
 
-        modal.querySelector('.character-creator__modal-close').addEventListener('click', () => {
-            modal.remove();
+        // 确保输入框可以正常编辑
+        const inputs = modal.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            input.removeAttribute('readonly');
+            input.removeAttribute('disabled');
         });
 
-        modal.querySelector('#cancelBtn').addEventListener('click', () => {
-            modal.remove();
-        });
+        const closeModal = () => {
+            if (modal && modal.parentNode) {
+                modal.remove();
+            }
+        };
+
+        modal.querySelector('.character-creator__modal-close').addEventListener('click', closeModal);
+
+        modal.querySelector('#cancelBtn').addEventListener('click', closeModal);
 
         modal.querySelector('#addCharacterForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await this.addCharacter(new FormData(e.target));
-            modal.remove();
+            try {
+                await this.addCharacter(new FormData(e.target));
+                closeModal();
+            } catch (error) {
+                console.error('添加角色失败:', error);
+                new Notice('添加角色失败，请重试');
+            }
         });
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                modal.remove();
+                closeModal();
             }
         });
+
+        // 防止事件冒泡导致的问题
+        modal.querySelector('.character-creator__modal-content').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // 自动聚焦到第一个输入框
+        setTimeout(() => {
+            const firstInput = modal.querySelector('input[name="name"]');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
     }
 
     async addCharacter(formData) {
@@ -1268,44 +1346,88 @@ class CharacterCreator {
 
         document.body.appendChild(modal);
 
-        modal.querySelector('.character-creator__modal-close').addEventListener('click', () => {
-            modal.remove();
-        });
+        const closeModal = () => {
+            if (modal && modal.parentNode) {
+                modal.remove();
+            }
+        };
 
-        modal.querySelector('#closeBtn').addEventListener('click', () => {
-            modal.remove();
-        });
+        modal.querySelector('.character-creator__modal-close').addEventListener('click', closeModal);
+        modal.querySelector('#closeBtn').addEventListener('click', closeModal);
 
         modal.querySelector('#editBtn').addEventListener('click', () => {
+            closeModal();
             this.showEditCharacterModal(character);
-            modal.remove();
         });
 
         modal.querySelector('#deleteBtn').addEventListener('click', async () => {
-            if (confirm('确定要删除这个角色吗？')) {
-                await this.deleteCharacter(id);
-                modal.remove();
+            if (confirm(`确定要删除角色 "${character.name}" 吗？`)) {
+                await this.deleteCharacter(character.id);
+                closeModal();
             }
         });
 
-        modal.querySelector('#addImageBtn').addEventListener('click', async () => {
-            await this.addImageToCharacter(character);
-            // 直接更新当前模态框中的图片画廊，而不是重新创建界面
-            this.updateImageGallery(modal, character);
+        modal.querySelector('#addImageBtn').addEventListener('click', () => {
+            this.addImageToCharacter(character);
         });
 
         modal.querySelector('#setImagePathBtn').addEventListener('click', () => {
             this.plugin.showFilePathModal();
         });
 
-        // 绑定图片拖拽和删除事件
-        this.bindImageEvents(modal, character);
+        // 绑定图片画廊事件
+        this.bindImageGalleryEvents(modal, character);
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                modal.remove();
+                closeModal();
             }
         });
+    }
+
+    bindImageGalleryEvents(modal, character) {
+        // 图包展开/收缩按钮事件
+        modal.querySelectorAll('.character-creator__image-package-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const groupIndex = e.target.dataset.group;
+                const packageDetails = modal.querySelector(`.character-creator__image-package-details[data-group="${groupIndex}"]`);
+                const isExpanded = packageDetails.classList.contains('expanded');
+
+                if (isExpanded) {
+                    packageDetails.classList.remove('expanded');
+                    packageDetails.classList.add('collapsed');
+                    e.target.textContent = '+';
+                } else {
+                    packageDetails.classList.remove('collapsed');
+                    packageDetails.classList.add('expanded');
+                    e.target.textContent = '−';
+                }
+            });
+        });
+
+        // 图片点击放大事件 - 使用事件委托
+        modal.querySelector('#imageGalleryContainer').addEventListener('click', (e) => {
+            const galleryImage = e.target.closest('.character-creator__gallery-image');
+            if (galleryImage) {
+                e.preventDefault();
+                this.showImageLightbox(character, galleryImage.dataset.imagePath);
+            }
+        });
+
+        // 删除图片事件 - 使用事件委托
+        modal.querySelector('#imageGalleryContainer').addEventListener('click', async (e) => {
+            const removeBtn = e.target.closest('.character-creator__image-remove');
+            if (removeBtn) {
+                e.stopPropagation();
+                const index = parseInt(removeBtn.dataset.index);
+                await this.removeImageFromCharacter(character, index);
+                this.updateImageGallery(modal, character);
+            }
+        });
+
+        // 拖拽排序事件
+        this.bindDragAndDropEvents(modal, character);
     }
 
     renderImageGallery(character) {
@@ -1313,23 +1435,160 @@ class CharacterCreator {
             return '<p class="character-creator__no-images">暂无图片</p>';
         }
 
-        return `
-            <div class="character-creator__image-grid" data-character-id="${character.id}">
-                ${character.images.map((image, index) => {
-            const imageUrl = this.app.vault.adapter.getResourcePath(image);
-            return `
-                        <div class="character-creator__image-item" draggable="true" data-index="${index}">
-                            <img src="${imageUrl}" alt="角色图片 ${index + 1}" class="character-creator__gallery-image">
-                            <button class="character-creator__image-remove" data-index="${index}">&times;</button>
-                            <div class="character-creator__image-drag-handle">⋮⋮</div>
+        // 将图片按文件夹分组，识别图包
+        const imageGroups = this.groupImagesByFolder(character.images);
+
+        let galleryHTML = '<div class="character-creator__image-grid" data-character-id="${character.id}">';
+
+        Object.entries(imageGroups).forEach(([folderName, images], groupIndex) => {
+            if (images.length === 1) {
+                // 散图：直接显示
+                const image = images[0];
+                const imageUrl = this.app.vault.adapter.getResourcePath(image);
+                galleryHTML += `
+                    <div class="character-creator__image-item" draggable="true" data-index="${character.images.indexOf(image)}">
+                        <img src="${imageUrl}" alt="角色图片" class="character-creator__gallery-image" data-image-path="${image}">
+                        <button class="character-creator__image-remove" data-index="${character.images.indexOf(image)}">&times;</button>
+                        <div class="character-creator__image-drag-handle">⋮⋮</div>
+                    </div>
+                `;
+            } else {
+                // 图包：显示第一张图片 + 展开/收缩功能
+                const firstImage = images[0];
+                const imageUrl = this.app.vault.adapter.getResourcePath(firstImage);
+                const isExpanded = false; // 默认收缩状态
+
+                // 确定图包名称
+                let packageName = '图包';
+                if (folderName.startsWith('character-')) {
+                    packageName = '角色图包';
+                } else if (folderName !== '默认图片') {
+                    packageName = folderName;
+                }
+
+                galleryHTML += `
+                    <div class="character-creator__image-package" data-group="${groupIndex}">
+                        <div class="character-creator__image-package-main">
+                            <div class="character-creator__image-item" draggable="true" data-index="${character.images.indexOf(firstImage)}">
+                                <img src="${imageUrl}" alt="图包主图" class="character-creator__gallery-image" data-image-path="${firstImage}">
+                                <button class="character-creator__image-remove" data-index="${character.images.indexOf(firstImage)}">&times;</button>
+                                <div class="character-creator__image-drag-handle">⋮⋮</div>
+                            </div>
+                            <div class="character-creator__image-package-info">
+                                <span class="character-creator__image-package-label">${packageName}</span>
+                                <span class="character-creator__image-package-count">${images.length}</span>
+                                <button class="character-creator__image-package-toggle" data-group="${groupIndex}">
+                                    ${isExpanded ? '−' : '+'}
+                                </button>
+                            </div>
                         </div>
-                    `;
-        }).join('')}
-            </div>
-        `;
+                        <div class="character-creator__image-package-details ${isExpanded ? 'expanded' : 'collapsed'}" data-group="${groupIndex}">
+                            ${images.slice(1).map((image, index) => {
+                    const detailImageUrl = this.app.vault.adapter.getResourcePath(image);
+                    return `
+                                    <div class="character-creator__image-item character-creator__image-item--package" draggable="true" data-index="${character.images.indexOf(image)}">
+                                        <img src="${detailImageUrl}" alt="图包图片 ${index + 2}" class="character-creator__gallery-image" data-image-path="${image}">
+                                        <button class="character-creator__image-remove" data-index="${character.images.indexOf(image)}">&times;</button>
+                                        <div class="character-creator__image-drag-handle">⋮⋮</div>
+                                    </div>
+                                `;
+                }).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        galleryHTML += '</div>';
+        return galleryHTML;
+    }
+
+    groupImagesByFolder(images) {
+        const groups = {};
+
+        images.forEach(imagePath => {
+            const pathParts = imagePath.split('/');
+            // 如果图片在角色专属文件夹中，使用角色ID作为分组
+            if (pathParts.length > 2 && pathParts[pathParts.length - 2].startsWith('character-')) {
+                const characterId = pathParts[pathParts.length - 2];
+                if (!groups[characterId]) {
+                    groups[characterId] = [];
+                }
+                groups[characterId].push(imagePath);
+            } else {
+                // 其他情况，使用文件夹名或默认分组
+                const folderName = pathParts.length > 2 ? pathParts[pathParts.length - 2] : '默认图片';
+                if (!groups[folderName]) {
+                    groups[folderName] = [];
+                }
+                groups[folderName].push(imagePath);
+            }
+        });
+
+        return groups;
     }
 
     async addImageToCharacter(character) {
+        // 创建选择器容器
+        const selectorContainer = document.createElement('div');
+        selectorContainer.className = 'character-creator__modal';
+        selectorContainer.innerHTML = `
+            <div class="character-creator__modal-content">
+                <div class="character-creator__modal-header">
+                    <h2 class="character-creator__modal-title">添加图片</h2>
+                    <button class="character-creator__modal-close">&times;</button>
+                </div>
+                <div class="character-creator__modal-body">
+                    <div class="character-creator__image-upload-options">
+                        <div class="character-creator__upload-option">
+                            <h3>选择单张或多张图片</h3>
+                            <p>选择零散的图片文件</p>
+                            <button class="character-creator__btn character-creator__btn--primary" id="selectFilesBtn">选择图片文件</button>
+                        </div>
+                        <div class="character-creator__upload-option">
+                            <h3>导入图包文件夹</h3>
+                            <p>选择包含图片的文件夹，自动复制所有图片</p>
+                            <button class="character-creator__btn character-creator__btn--secondary" id="selectFolderBtn">选择文件夹</button>
+                        </div>
+                    </div>
+                    <div class="character-creator__form-actions">
+                        <button class="character-creator__btn character-creator__btn--secondary" id="cancelBtn">取消</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(selectorContainer);
+
+        const closeSelector = () => {
+            if (selectorContainer && selectorContainer.parentNode) {
+                selectorContainer.remove();
+            }
+        };
+
+        selectorContainer.querySelector('.character-creator__modal-close').addEventListener('click', closeSelector);
+        selectorContainer.querySelector('#cancelBtn').addEventListener('click', closeSelector);
+
+        // 选择单张或多张图片
+        selectorContainer.querySelector('#selectFilesBtn').addEventListener('click', async () => {
+            closeSelector();
+            await this.selectImageFiles(character);
+        });
+
+        // 选择文件夹
+        selectorContainer.querySelector('#selectFolderBtn').addEventListener('click', async () => {
+            closeSelector();
+            await this.selectImageFolder(character);
+        });
+
+        selectorContainer.addEventListener('click', (e) => {
+            if (e.target === selectorContainer) {
+                closeSelector();
+            }
+        });
+    }
+
+    async selectImageFiles(character) {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
@@ -1337,31 +1596,255 @@ class CharacterCreator {
 
         input.addEventListener('change', async (e) => {
             const files = Array.from(e.target.files);
-
-            for (const file of files) {
-                try {
-                    const imagePath = await this.saveImageToVault(file);
-                    character.images.push(imagePath);
-                } catch (error) {
-                    console.error('保存图片失败:', error);
-                    new Notice('保存图片失败');
-                }
-            }
-
-            const currentPage = this.getCurrentPage();
-            if (currentPage) {
-                await this.savePage(currentPage);
-            }
-            this.render();
-            new Notice(`成功添加 ${files.length} 张图片`);
+            await this.processImageFiles(character, files, '图片');
         });
 
         input.click();
     }
 
-    async saveImageToVault(file) {
+    async selectImageFolder(character) {
+        // 在Obsidian环境中，webkitdirectory可能不被支持
+        // 提供替代方案：选择多个文件来创建图包
+        const modal = document.createElement('div');
+        modal.className = 'character-creator__modal';
+        modal.innerHTML = `
+            <div class="character-creator__modal-content">
+                <div class="character-creator__modal-header">
+                    <h2 class="character-creator__modal-title">创建图包</h2>
+                    <button class="character-creator__modal-close">&times;</button>
+                </div>
+                <div class="character-creator__modal-body">
+                    <div class="character-creator__package-options">
+                        <div class="character-creator__package-option">
+                            <h3>方法一：选择多个图片文件</h3>
+                            <p>选择多个图片文件，它们将被组织成一个图包</p>
+                            <button class="character-creator__btn character-creator__btn--primary" id="selectMultipleFilesBtn">选择多个图片</button>
+                        </div>
+                        <div class="character-creator__package-option">
+                            <h3>方法二：拖拽文件夹</h3>
+                            <p>将包含图片的文件夹拖拽到下方区域</p>
+                            <div class="character-creator__drop-zone" id="dropZone">
+                                <div class="character-creator__drop-zone-content">
+                                    <span class="character-creator__drop-zone-icon">📁</span>
+                                    <p>拖拽文件夹到这里</p>
+                                    <p class="character-creator__drop-zone-hint">或者点击选择文件夹</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="character-creator__form-actions">
+                        <button class="character-creator__btn character-creator__btn--secondary" id="cancelBtn">取消</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const closeModal = () => {
+            if (modal && modal.parentNode) {
+                modal.remove();
+            }
+        };
+
+        modal.querySelector('.character-creator__modal-close').addEventListener('click', closeModal);
+        modal.querySelector('#cancelBtn').addEventListener('click', closeModal);
+
+        // 选择多个图片文件
+        modal.querySelector('#selectMultipleFilesBtn').addEventListener('click', async () => {
+            closeModal();
+            await this.selectMultipleImageFiles(character);
+        });
+
+        // 拖拽区域点击事件
+        modal.querySelector('#dropZone').addEventListener('click', () => {
+            this.selectFolderViaInput(character);
+        });
+
+        // 拖拽事件
+        const dropZone = modal.querySelector('#dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+
+            const items = Array.from(e.dataTransfer.items);
+            const files = [];
+
+            for (const item of items) {
+                if (item.kind === 'file') {
+                    const entry = item.webkitGetAsEntry();
+                    if (entry && entry.isDirectory) {
+                        await this.readDirectory(entry, files);
+                    }
+                }
+            }
+
+            if (files.length > 0) {
+                closeModal();
+                await this.processImageFiles(character, files, '图片');
+            } else {
+                new Notice('拖拽的文件夹中没有找到图片文件');
+            }
+        });
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }
+
+    async selectMultipleImageFiles(character) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = true;
+
+        input.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files);
+            await this.processImageFiles(character, files, '图片');
+        });
+
+        input.click();
+    }
+
+    selectFolderViaInput(character) {
+        // 尝试使用webkitdirectory，如果失败则提示选择多个文件
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.webkitdirectory = true;
+        input.multiple = true;
+
+        input.addEventListener('change', async (e) => {
+            const files = Array.from(e.target.files).filter(file =>
+                file.type.startsWith('image/')
+            );
+
+            if (files.length === 0) {
+                new Notice('所选文件夹中没有找到图片文件，请尝试选择多个图片文件');
+                return;
+            }
+
+            await this.processImageFiles(character, files, '图片');
+        });
+
+        input.addEventListener('error', () => {
+            new Notice('文件夹选择失败，请使用"选择多个图片"功能');
+        });
+
+        input.click();
+    }
+
+    async readDirectory(dirEntry, files) {
+        return new Promise((resolve) => {
+            const reader = dirEntry.createReader();
+
+            const readEntries = () => {
+                reader.readEntries(async (entries) => {
+                    for (const entry of entries) {
+                        if (entry.isFile) {
+                            const file = await this.getFileFromEntry(entry);
+                            if (file && file.type.startsWith('image/')) {
+                                files.push(file);
+                            }
+                        } else if (entry.isDirectory) {
+                            await this.readDirectory(entry, files);
+                        }
+                    }
+                    resolve();
+                });
+            };
+
+            readEntries();
+        });
+    }
+
+    getFileFromEntry(entry) {
+        return new Promise((resolve) => {
+            entry.file(resolve);
+        });
+    }
+
+    async processImageFiles(character, files, type) {
+        console.log(`开始处理${type}文件，数量:`, files.length);
+
+        const currentPage = this.getCurrentPage();
+        if (!currentPage) {
+            console.error('未找到当前页面');
+            new Notice('未找到当前页面，请重试');
+            return;
+        }
+
+        // 为每个角色创建独立的图片文件夹
         const imageFolder = this.plugin && this.plugin.settings ? this.plugin.settings.imageFolder : 'character-creator/character-images';
-        await this.ensureFolderExists(imageFolder);
+        const characterImageFolder = `${imageFolder}/${character.id}`;
+        console.log('角色图片文件夹:', characterImageFolder);
+
+        try {
+            await this.ensureFolderExists(characterImageFolder);
+        } catch (error) {
+            console.error('创建文件夹失败:', error);
+            new Notice('创建图片文件夹失败，请检查权限');
+            return;
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const file of files) {
+            try {
+                console.log('处理文件:', file.name);
+                const imagePath = await this.saveImageToVault(file, character.id);
+                character.images.push(imagePath);
+                successCount++;
+                console.log('文件保存成功:', imagePath);
+            } catch (error) {
+                console.error('保存图片失败:', file.name, error);
+                errorCount++;
+            }
+        }
+
+        try {
+            await this.savePage(currentPage);
+            this.render();
+            console.log('页面保存和渲染完成');
+        } catch (error) {
+            console.error('保存页面失败:', error);
+            new Notice('保存页面失败，请重试');
+            return;
+        }
+
+        if (errorCount > 0) {
+            new Notice(`成功添加 ${successCount} 张图片，${errorCount} 张失败`);
+        } else {
+            new Notice(`成功添加 ${successCount} 张图片`);
+        }
+    }
+
+    async saveImageToVault(file, characterId = null) {
+        console.log('保存图片到仓库:', file.name, '角色ID:', characterId);
+
+        const baseImageFolder = this.plugin && this.plugin.settings ? this.plugin.settings.imageFolder : 'character-creator/character-images';
+
+        // 如果指定了角色ID，则为该角色创建独立文件夹
+        const imageFolder = characterId ? `${baseImageFolder}/${characterId}` : baseImageFolder;
+        console.log('目标文件夹:', imageFolder);
+
+        try {
+            await this.ensureFolderExists(imageFolder);
+        } catch (error) {
+            console.error('确保文件夹存在失败:', error);
+            throw new Error(`无法创建文件夹: ${imageFolder}`);
+        }
 
         // 自动重命名图片文件
         const timestamp = Date.now();
@@ -1369,12 +1852,25 @@ class CharacterCreator {
         const newFileName = `character-image-${timestamp}.${fileExtension}`;
         const filePath = `${imageFolder}/${newFileName}`;
 
-        // 保存图片文件
-        const arrayBuffer = await file.arrayBuffer();
-        await this.app.vault.createBinary(filePath, arrayBuffer);
+        console.log('新文件路径:', filePath);
 
-        // 更新图片索引文件
-        await this.updateImageIndex(filePath, file.name);
+        try {
+            // 保存图片文件
+            const arrayBuffer = await file.arrayBuffer();
+            await this.app.vault.createBinary(filePath, arrayBuffer);
+            console.log('文件保存成功:', filePath);
+        } catch (error) {
+            console.error('创建二进制文件失败:', error);
+            throw new Error(`无法保存文件: ${file.name}`);
+        }
+
+        try {
+            // 更新图片索引文件
+            await this.updateImageIndex(filePath, file.name);
+        } catch (error) {
+            console.error('更新图片索引失败:', error);
+            // 不抛出错误，因为文件已经保存成功
+        }
 
         return filePath;
     }
@@ -1427,6 +1923,12 @@ class CharacterCreator {
         const currentPage = this.getCurrentPage();
         if (!currentPage) return;
 
+        // 清理可能存在的旧模态框
+        const existingModal = document.querySelector('.character-creator__modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
         const modal = document.createElement('div');
         modal.className = 'character-creator__modal';
         modal.innerHTML = `
@@ -1453,25 +1955,52 @@ class CharacterCreator {
 
         document.body.appendChild(modal);
 
-        modal.querySelector('.character-creator__modal-close').addEventListener('click', () => {
-            modal.remove();
+        // 确保输入框可以正常编辑
+        const inputs = modal.querySelectorAll('input, textarea, select');
+        inputs.forEach(input => {
+            input.removeAttribute('readonly');
+            input.removeAttribute('disabled');
         });
 
-        modal.querySelector('#cancelBtn').addEventListener('click', () => {
-            modal.remove();
-        });
+        const closeModal = () => {
+            if (modal && modal.parentNode) {
+                modal.remove();
+            }
+        };
+
+        modal.querySelector('.character-creator__modal-close').addEventListener('click', closeModal);
+
+        modal.querySelector('#cancelBtn').addEventListener('click', closeModal);
 
         modal.querySelector('#editCharacterForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            await this.updateCharacter(character.id, new FormData(e.target));
-            modal.remove();
+            try {
+                await this.updateCharacter(character.id, new FormData(e.target));
+                closeModal();
+            } catch (error) {
+                console.error('更新角色失败:', error);
+                new Notice('更新角色失败，请重试');
+            }
         });
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                modal.remove();
+                closeModal();
             }
         });
+
+        // 防止事件冒泡导致的问题
+        modal.querySelector('.character-creator__modal-content').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // 自动聚焦到第一个输入框
+        setTimeout(() => {
+            const firstInput = modal.querySelector('input[name="name"]');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 100);
     }
 
     async updateCharacter(id, formData) {
@@ -1605,8 +2134,8 @@ class CharacterCreator {
         // 更新图片画廊内容
         imageGalleryContainer.innerHTML = this.renderImageGallery(character);
 
-        // 重新绑定图片事件
-        this.bindImageEvents(modal, character);
+        // 重新绑定图片画廊事件
+        this.bindImageGalleryEvents(modal, character);
     }
 
     async reorderImages(character, fromIndex, toIndex) {
@@ -1962,6 +2491,299 @@ class CharacterCreator {
     getRandomEmoji() {
         const emojis = ['👸', '🧙‍♂️', '🦹‍♀️', '🧝‍♀️', '🧙‍♀️', '👨‍⚔️', '👩‍⚔️', '🧝‍♂️'];
         return emojis[Math.floor(Math.random() * emojis.length)];
+    }
+
+    showImageLightbox(character, currentImagePath) {
+        const currentIndex = character.images.indexOf(currentImagePath);
+        if (currentIndex === -1) return;
+
+        const lightbox = document.createElement('div');
+        lightbox.className = 'character-creator__lightbox';
+        lightbox.innerHTML = `
+            <div class="character-creator__lightbox-content">
+                <div class="character-creator__lightbox-header">
+                    <span class="character-creator__lightbox-counter">${currentIndex + 1} / ${character.images.length}</span>
+                    <div class="character-creator__lightbox-controls">
+                        <button class="character-creator__lightbox-zoom-out" title="缩小">−</button>
+                        <span class="character-creator__lightbox-zoom-level">100%</span>
+                        <button class="character-creator__lightbox-zoom-in" title="放大">+</button>
+                        <button class="character-creator__lightbox-reset" title="重置缩放">↺</button>
+                    </div>
+                    <button class="character-creator__lightbox-close">&times;</button>
+                </div>
+                <div class="character-creator__lightbox-image-container">
+                    <button class="character-creator__lightbox-nav character-creator__lightbox-prev" ${currentIndex === 0 ? 'disabled' : ''}>&lt;</button>
+                    <img src="${this.app.vault.adapter.getResourcePath(currentImagePath)}" 
+                         alt="角色图片 ${currentIndex + 1}" 
+                         class="character-creator__lightbox-image">
+                    <button class="character-creator__lightbox-nav character-creator__lightbox-next" ${currentIndex === character.images.length - 1 ? 'disabled' : ''}>&gt;</button>
+                </div>
+                <div class="character-creator__lightbox-thumbnails">
+                    ${character.images.map((image, index) => `
+                        <img src="${this.app.vault.adapter.getResourcePath(image)}" 
+                             alt="缩略图 ${index + 1}" 
+                             class="character-creator__lightbox-thumbnail ${index === currentIndex ? 'active' : ''}"
+                             data-index="${index}">
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(lightbox);
+
+        const closeLightbox = () => {
+            if (lightbox && lightbox.parentNode) {
+                lightbox.remove();
+            }
+        };
+
+        let currentImageIndex = currentIndex;
+        let currentZoom = 1;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let translateX = 0;
+        let translateY = 0;
+
+        const mainImage = lightbox.querySelector('.character-creator__lightbox-image');
+        const zoomLevel = lightbox.querySelector('.character-creator__lightbox-zoom-level');
+
+        const updateZoom = (newZoom) => {
+            currentZoom = Math.max(0.1, Math.min(5, newZoom));
+            mainImage.style.transform = `scale(${currentZoom}) translate(${translateX / currentZoom}px, ${translateY / currentZoom}px)`;
+            zoomLevel.textContent = `${Math.round(currentZoom * 100)}%`;
+        };
+
+        const resetZoom = () => {
+            currentZoom = 1;
+            translateX = 0;
+            translateY = 0;
+            mainImage.style.transform = 'scale(1) translate(0px, 0px)';
+            zoomLevel.textContent = '100%';
+        };
+
+        const updateLightbox = (newIndex) => {
+            if (newIndex < 0 || newIndex >= character.images.length) return;
+
+            currentImageIndex = newIndex;
+            const newImagePath = character.images[newIndex];
+
+            // 重置缩放
+            resetZoom();
+
+            // 更新主图片
+            mainImage.src = this.app.vault.adapter.getResourcePath(newImagePath);
+
+            // 更新计数器
+            const counter = lightbox.querySelector('.character-creator__lightbox-counter');
+            counter.textContent = `${newIndex + 1} / ${character.images.length}`;
+
+            // 更新缩略图
+            lightbox.querySelectorAll('.character-creator__lightbox-thumbnail').forEach((thumb, index) => {
+                thumb.classList.toggle('active', index === newIndex);
+            });
+
+            // 更新导航按钮状态
+            lightbox.querySelector('.character-creator__lightbox-prev').disabled = newIndex === 0;
+            lightbox.querySelector('.character-creator__lightbox-next').disabled = newIndex === character.images.length - 1;
+        };
+
+        // 关闭按钮
+        lightbox.querySelector('.character-creator__lightbox-close').addEventListener('click', closeLightbox);
+
+        // 缩放控制按钮
+        lightbox.querySelector('.character-creator__lightbox-zoom-in').addEventListener('click', () => {
+            updateZoom(currentZoom * 1.2);
+        });
+
+        lightbox.querySelector('.character-creator__lightbox-zoom-out').addEventListener('click', () => {
+            updateZoom(currentZoom / 1.2);
+        });
+
+        lightbox.querySelector('.character-creator__lightbox-reset').addEventListener('click', resetZoom);
+
+        // 滚轮缩放
+        lightbox.querySelector('.character-creator__lightbox-image-container').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            updateZoom(currentZoom * delta);
+        });
+
+        // 鼠标拖拽
+        mainImage.addEventListener('mousedown', (e) => {
+            if (currentZoom > 1) {
+                isDragging = true;
+                dragStartX = e.clientX - translateX;
+                dragStartY = e.clientY - translateY;
+                mainImage.style.cursor = 'grabbing';
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging && currentZoom > 1) {
+                translateX = e.clientX - dragStartX;
+                translateY = e.clientY - dragStartY;
+                updateZoom(currentZoom);
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                mainImage.style.cursor = 'grab';
+            }
+        });
+
+        // 导航按钮
+        lightbox.querySelector('.character-creator__lightbox-prev').addEventListener('click', () => {
+            if (currentImageIndex > 0) {
+                updateLightbox(currentImageIndex - 1);
+            }
+        });
+
+        lightbox.querySelector('.character-creator__lightbox-next').addEventListener('click', () => {
+            if (currentImageIndex < character.images.length - 1) {
+                updateLightbox(currentImageIndex + 1);
+            }
+        });
+
+        // 缩略图点击
+        lightbox.querySelectorAll('.character-creator__lightbox-thumbnail').forEach(thumb => {
+            thumb.addEventListener('click', () => {
+                const index = parseInt(thumb.dataset.index);
+                updateLightbox(index);
+            });
+        });
+
+        // 键盘导航
+        const handleKeydown = (e) => {
+            switch (e.key) {
+                case 'Escape':
+                    closeLightbox();
+                    break;
+                case 'ArrowLeft':
+                    if (currentImageIndex > 0) {
+                        updateLightbox(currentImageIndex - 1);
+                    }
+                    break;
+                case 'ArrowRight':
+                    if (currentImageIndex < character.images.length - 1) {
+                        updateLightbox(currentImageIndex + 1);
+                    }
+                    break;
+                case '+':
+                case '=':
+                    e.preventDefault();
+                    updateZoom(currentZoom * 1.2);
+                    break;
+                case '-':
+                    e.preventDefault();
+                    updateZoom(currentZoom / 1.2);
+                    break;
+                case '0':
+                    e.preventDefault();
+                    resetZoom();
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeydown);
+
+        // 点击背景关闭
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) {
+                closeLightbox();
+            }
+        });
+
+        // 清理事件监听器
+        lightbox.addEventListener('remove', () => {
+            document.removeEventListener('keydown', handleKeydown);
+            document.removeEventListener('mousemove', () => { });
+            document.removeEventListener('mouseup', () => { });
+        });
+    }
+
+    bindDragAndDropEvents(modal, character) {
+        const imageItems = modal.querySelectorAll('.character-creator__image-item');
+
+        imageItems.forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', item.dataset.index);
+                item.classList.add('dragging');
+            });
+
+            item.addEventListener('dragend', () => {
+                item.classList.remove('dragging');
+            });
+        });
+
+        const imageGrids = modal.querySelectorAll('.character-creator__image-grid');
+
+        imageGrids.forEach(grid => {
+            grid.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                grid.classList.add('drag-over');
+            });
+
+            grid.addEventListener('dragleave', () => {
+                grid.classList.remove('drag-over');
+            });
+
+            grid.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                grid.classList.remove('drag-over');
+
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIndex = this.getDropIndex(e, grid);
+
+                if (fromIndex !== toIndex && fromIndex !== -1 && toIndex !== -1) {
+                    await this.reorderImages(character, fromIndex, toIndex);
+                    this.updateImageGallery(modal, character);
+                }
+            });
+        });
+    }
+
+    getDropIndex(e, grid) {
+        const items = Array.from(grid.querySelectorAll('.character-creator__image-item'));
+        const rect = grid.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // 简单的网格位置计算
+        const itemWidth = 120; // 图片项宽度
+        const itemHeight = 120; // 图片项高度
+        const gap = 16; // 间距
+
+        const col = Math.floor(x / (itemWidth + gap));
+        const row = Math.floor(y / (itemHeight + gap));
+        const colsPerRow = Math.floor(grid.offsetWidth / (itemWidth + gap));
+
+        const index = row * colsPerRow + col;
+        return Math.max(0, Math.min(index, items.length - 1));
+    }
+
+    // 测试方法：验证图包功能
+    testImagePackageFunction() {
+        console.log('=== 图包功能测试 ===');
+        console.log('插件实例:', this.plugin);
+        console.log('插件设置:', this.plugin?.settings);
+        console.log('图片文件夹设置:', this.plugin?.settings?.imageFolder);
+        console.log('浏览器支持webkitdirectory:', !!document.createElement('input').webkitdirectory);
+
+        // 测试文件选择器
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.webkitdirectory = true;
+        input.multiple = true;
+
+        input.addEventListener('change', (e) => {
+            console.log('测试文件选择器工作正常');
+            console.log('选择的文件数量:', e.target.files.length);
+        });
+
+        input.click();
     }
 }
 

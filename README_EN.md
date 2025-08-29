@@ -18,11 +18,21 @@ A powerful Obsidian plugin designed for Managers, game designers, novelists, and
 
 ### 🖼️ Image Management
 - **Multiple Images**: Add multiple images for each character
+- **Image Package Import**: Support importing entire folders of images, automatically copy and rename
+- **Independent Storage**: Each character's images are stored in separate folders to avoid confusion
 - **Auto Rename**: Images are automatically renamed for easy management
 - **Image Index**: Automatically creates `image-index.md` file to record all image information
 - **Drag & Drop**: Drag images to reorder, with the first image displayed as thumbnail
 - **Image Deletion**: Click delete button to remove unwanted images
 - **Custom Path**: Set custom image storage folder path
+- **Smart Grouping**: Automatically identify single images and image packages, packages support expand/collapse viewing
+- **Image Zoom**: Click any image to zoom in, supports:
+  - Left/right arrow keys to switch images
+  - Mouse wheel to zoom in/out
+  - Mouse drag to pan image
+  - Click thumbnails for quick navigation
+  - ESC key to close zoom view
+  - Keyboard shortcuts: +/- zoom, 0 reset
 
 ### 📑 Multi-Page Management
 - **Independent Pages**: Create multiple independent character pages
@@ -125,8 +135,25 @@ A powerful Obsidian plugin designed for Managers, game designers, novelists, and
 
 #### Add Images
 1. Click "Add Image" in character detail page
-2. Select one or multiple image files
-3. Images will be automatically renamed and saved to specified folder
+2. Choose addition method:
+   - **Select Image Files**: Select single or multiple image files
+   - **Import Image Package**: Create image package, supports two methods:
+     - Select multiple image files: Select multiple images at once to create a package
+     - Drag and drop folder: Drag a folder containing images to the specified area
+3. Images will be automatically renamed and saved to the character's independent folder
+
+#### Image Grouping and Viewing
+- **Auto Grouping**: Images are automatically grouped by source folder
+- **Single Image Display**: Individual images are displayed directly in the image grid
+- **Image Package Display**: Image sets are displayed as packages, including:
+  - Main Image: Shows the first image as a representative
+  - Label: Shows "Package" label and image count
+  - Expand/Collapse: Click button to expand and show all images or collapse back to show only the main image
+- **Image Zoom**: Click any image to zoom in, supports:
+  - Left/right arrow keys to switch images
+  - Mouse wheel to switch images
+  - Click thumbnails for quick navigation
+  - ESC key to close zoom view
 
 #### Image Settings
 1. Click "Set Image Path" button
@@ -196,8 +223,12 @@ your-vault/
 │       └── auto-backup-2024-01-01T12-00-00-000Z.json
 └── character-Manager/character-images/  # Image storage folder (configurable)
     ├── image-index.md             # Image index file
-    ├── character-image-1234567890.jpg
-    └── character-image-1234567891.png
+    ├── character-1234567890/      # Character 1's image folder
+    │   ├── character-image-1234567890.jpg
+    │   └── character-image-1234567891.png
+    └── character-1234567891/      # Character 2's image folder
+        ├── character-image-1234567892.jpg
+        └── character-image-1234567893.png
 ```
 
 ### Image Index File Example
@@ -254,9 +285,19 @@ You can customize interface colors by modifying CSS variables:
 - **Tablet**: 768px - 1199px
 - **Mobile**: 767px and below
 
-## 📝 Changelog
+## 🎨 Changelog
 
-### v1.4.0 (Current Version)
+### v1.5.0 (Current Version)
+- ✨ Added image package import functionality, support selecting folders for batch image import
+- ✨ Added smart image grouping, automatically identify single images and image packages
+- ✨ Added image package expand/collapse functionality, default shows main image, click to expand and view all
+- ✨ Added image zoom functionality with keyboard and mouse navigation
+- ✨ Optimized image storage structure with independent folders for each character
+- ✨ Improved image upload interface with more intuitive selection options
+- 🐛 Fixed dialog editing issues
+- 🐛 Fixed image index file update issues
+
+### v1.4.0
 - ✨ Added image index file functionality
 - ✨ Image auto-rename
 - ✨ Image path setting button

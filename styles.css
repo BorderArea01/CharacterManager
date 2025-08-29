@@ -3780,8 +3780,8 @@ select.character-creator__form-input option {
 }
 
 .character-creator__image-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
     margin-top: 1rem;
 }
@@ -3792,11 +3792,14 @@ select.character-creator__form-input option {
     overflow: hidden;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     transition: all 0.2s ease;
+    width: 120px;
+    height: 120px;
+    flex-shrink: 0;
 }
 
 .character-creator__gallery-image {
     width: 100%;
-    height: 120px;
+    height: 100%;
     object-fit: cover;
     display: block;
 }
@@ -4164,4 +4167,444 @@ select.character-creator__form-input option {
     .character-creator__image-actions {
         flex-direction: column;
     }
+}
+
+/* 图片上传选项样式 */
+.character-creator__image-upload-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.character-creator__upload-option {
+    padding: 1.5rem;
+    border: 2px dashed var(--character-border);
+    border-radius: var(--character-radius);
+    text-align: center;
+    transition: var(--character-transition);
+}
+
+.character-creator__upload-option:hover {
+    border-color: var(--character-primary);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.character-creator__upload-option h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--character-text);
+    font-size: 1.1rem;
+}
+
+.character-creator__upload-option p {
+    margin: 0 0 1rem 0;
+    color: var(--character-text-muted);
+    font-size: 0.9rem;
+}
+
+/* 图片分组样式 */
+.character-creator__image-package {
+    border: 2px solid var(--character-primary);
+    border-radius: var(--character-radius);
+    padding: 0.5rem;
+    background: rgba(99, 102, 241, 0.05);
+    width: 120px;
+    height: 120px;
+    box-sizing: border-box;
+    position: relative;
+}
+
+.character-creator__image-package-main {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+.character-creator__image-package-main .character-creator__image-item {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+}
+
+.character-creator__image-package-info {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+    pointer-events: none;
+}
+
+.character-creator__image-package-label {
+    background: var(--character-primary);
+    color: white;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.character-creator__image-package-count {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    line-height: 1;
+}
+
+.character-creator__image-package-toggle {
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.625rem;
+    cursor: pointer;
+    transition: var(--character-transition);
+    pointer-events: auto;
+}
+
+.character-creator__image-package-toggle:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.character-creator__image-package-details {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--character-background);
+    border: 1px solid var(--character-border);
+    border-radius: var(--character-radius);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    max-height: 300px;
+    overflow-y: auto;
+    transition: all 0.3s ease;
+}
+
+.character-creator__image-package-details.expanded {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.character-creator__image-package-details.collapsed {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    max-height: 0;
+}
+
+.character-creator__image-package-details .character-creator__image-item {
+    width: 80px;
+    height: 80px;
+    margin: 0.25rem;
+    display: inline-block;
+}
+
+.character-creator__image-item--package {
+    opacity: 0.9;
+    transition: var(--character-transition);
+}
+
+.character-creator__image-item--package:hover {
+    opacity: 1;
+}
+
+/* 图片灯箱样式 */
+.character-creator__lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    box-sizing: border-box;
+}
+
+.character-creator__lightbox-content {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: var(--character-background);
+    border-radius: var(--character-radius);
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+
+
+.character-creator__lightbox-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--character-text);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: var(--character-transition);
+}
+
+.character-creator__lightbox-close:hover {
+    background: var(--character-border);
+}
+
+.character-creator__lightbox-image-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    max-height: 70vh;
+}
+
+.character-creator__lightbox-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    cursor: grab;
+    transition: transform 0.1s ease;
+    user-select: none;
+}
+
+.character-creator__lightbox-image:active {
+    cursor: grabbing;
+}
+
+.character-creator__lightbox-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: var(--character-transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.character-creator__lightbox-nav:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.character-creator__lightbox-nav:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.character-creator__lightbox-prev {
+    left: 1rem;
+}
+
+.character-creator__lightbox-next {
+    right: 1rem;
+}
+
+.character-creator__lightbox-thumbnails {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: var(--character-background-secondary);
+    border-top: 1px solid var(--character-border);
+    overflow-x: auto;
+}
+
+.character-creator__lightbox-thumbnail {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: var(--character-radius);
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: var(--character-transition);
+    flex-shrink: 0;
+}
+
+.character-creator__lightbox-thumbnail:hover {
+    border-color: var(--character-primary);
+}
+
+.character-creator__lightbox-thumbnail.active {
+    border-color: var(--character-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+}
+
+/* 图片点击样式 */
+.character-creator__gallery-image {
+    cursor: pointer;
+    transition: var(--character-transition);
+}
+
+.character-creator__gallery-image:hover {
+    transform: scale(1.05);
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .character-creator__image-upload-options {
+        grid-template-columns: 1fr;
+    }
+
+    .character-creator__package-options {
+        grid-template-columns: 1fr;
+    }
+
+    .character-creator__lightbox {
+        padding: 1rem;
+    }
+
+    .character-creator__lightbox-nav {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+    }
+
+    .character-creator__lightbox-thumbnails {
+        padding: 0.5rem;
+    }
+
+    .character-creator__lightbox-thumbnail {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+/* 图包创建选项样式 */
+.character-creator__package-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.character-creator__package-option {
+    padding: 1.5rem;
+    border: 2px dashed var(--character-border);
+    border-radius: var(--character-radius);
+    text-align: center;
+    transition: var(--character-transition);
+}
+
+.character-creator__package-option:hover {
+    border-color: var(--character-primary);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.character-creator__package-option h3 {
+    margin: 0 0 0.5rem 0;
+    color: var(--character-text);
+    font-size: 1.1rem;
+}
+
+.character-creator__package-option p {
+    margin: 0 0 1rem 0;
+    color: var(--character-text-muted);
+    font-size: 0.9rem;
+}
+
+/* 拖拽区域样式 */
+.character-creator__drop-zone {
+    border: 2px dashed var(--character-border);
+    border-radius: var(--character-radius);
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--character-transition);
+    background: var(--character-background);
+}
+
+.character-creator__drop-zone:hover {
+    border-color: var(--character-primary);
+    background: rgba(99, 102, 241, 0.05);
+}
+
+.character-creator__drop-zone.drag-over {
+    border-color: var(--character-primary);
+    background: rgba(99, 102, 241, 0.1);
+    transform: scale(1.02);
+}
+
+.character-creator__drop-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.character-creator__drop-zone-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.character-creator__drop-zone-hint {
+    font-size: 0.8rem;
+    color: var(--character-text-muted);
+    font-style: italic;
+}
+
+.character-creator__lightbox-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: var(--character-background-secondary);
+    border-bottom: 1px solid var(--character-border);
+}
+
+.character-creator__lightbox-counter {
+    font-weight: 600;
+    color: var(--character-text);
+}
+
+.character-creator__lightbox-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.character-creator__lightbox-zoom-out,
+.character-creator__lightbox-zoom-in,
+.character-creator__lightbox-reset {
+    background: var(--character-secondary);
+    color: var(--character-text);
+    border: 1px solid var(--character-border);
+    border-radius: 0.25rem;
+    width: 32px;
+    height: 32px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--character-transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.character-creator__lightbox-zoom-out:hover,
+.character-creator__lightbox-zoom-in:hover,
+.character-creator__lightbox-reset:hover {
+    background: var(--character-border);
+}
+
+.character-creator__lightbox-zoom-level {
+    font-weight: 600;
+    color: var(--character-text);
+    min-width: 50px;
+    text-align: center;
+    font-size: 0.875rem;
 }
